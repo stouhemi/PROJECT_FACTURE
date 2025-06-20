@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice Management System</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Invoice Management System</h1>
+        
+        <div class="controls">
+            <div class="search-filters">
+                <input type="text" id="searchClient" placeholder="Client Name">
+                <input type="text" id="searchCompany" placeholder="Company">
+                <input type="date" id="searchDate">
+                <select id="searchStatus">
+                    <option value="">All Statuses</option>
+                    <option value="payé">Paid</option>
+                    <option value="impayé">Unpaid</option>
+                </select>
+                <button id="searchBtn">Search Invoices</button>
+                <button id="resetBtn">Reset Filters</button>
+            </div>
+            
+            <div class="action-buttons">
+                <button id="createBtn">Create New Invoice</button>
+            </div>
+        </div>
+        
+        <div id="invoicesList" class="invoices-list">
+            <!-- Invoices will be loaded here -->
+            <div class="loading">Loading invoices...</div>
+        </div>
+        
+        <div id="invoiceDetail" class="invoice-detail hidden">
+            <!-- Detailed invoice view will appear here -->
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
