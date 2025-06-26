@@ -385,10 +385,11 @@ def download_facture_pdf(facture_id):
         context = {
             'invoice_number': facture.numero_facture,
             'invoice_date': facture.date_facturation.strftime('%d/%m/%Y'),
-            'company_name': "Your Company Name",  # Replace with your company info
-            'company_address': "123 Business Street",
-            'company_phone': "+123 456 789",
-            'company_email': "contact@yourcompany.com",
+            'company_name': "STE YASMINE SERVICES",  # Replace with your company info
+            'company_address': "84, AV de la république- Hmmam-Lif",
+            'company_phone': "29 972 425 / 28 988 228",
+            'company_email': "salah.ferchichi.av",
+            'mf':"1693027 W / A / M / 000",
             'client_name': facture.nom_client,
             'client_company': facture.nom_societe or "",
             'client_address': facture.adresse or "",

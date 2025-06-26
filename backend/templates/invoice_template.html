@@ -89,6 +89,7 @@
                     <span class="info-label">Date:</span>
                     <span>{{ invoice_date }}</span>
                 </div>
+                
             </div>
         </div>
         <div>
@@ -96,6 +97,7 @@
             <div>{{ company_address }}</div>
             <div>Tél: {{ company_phone }}</div>
             <div>Email: {{ company_email }}</div>
+            <div>MF: {{ mf }}</div>
         </div>
     </div>
 
@@ -131,10 +133,10 @@
             <tr>
                 <td>{{ item.designation }}</td>
                 <td>{{ item.description }}</td>
-                <td>{{ item.unit_price }} €</td>
+                <td>{{ item.unit_price }} DT</td>
                 <td>{{ item.quantity }}</td>
-                <td>{{ item.total }} €</td>
-                <td>{{ item.vat }} €</td>
+                <td>{{ item.total }} DT</td>
+                <td>{{ item.vat }} DT</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -143,31 +145,31 @@
     <div class="summary">
         <div class="summary-row">
             <span>Total Services:</span>
-            <span>{{ total_services }} €</span>
+            <span>{{ total_services }} DT</span>
         </div>
         <div class="summary-row">
             <span>Total TVA:</span>
-            <span>{{ total_vat }} €</span>
+            <span>{{ total_vat }} DT</span>
         </div>
         <div class="summary-row">
             <span>Total TTC:</span>
-            <span>{{ total_ttc }} €</span>
+            <span>{{ total_ttc }} DT</span>
         </div>
         <div class="summary-row">
             <span>Frais:</span>
-            <span>{{ fees }} €</span>
+            <span>{{ fees }} DT</span>
         </div>
         <div class="summary-row">
             <span>Timbre:</span>
-            <span>{{ stamp }} €</span>
+            <span>{{ stamp }} DT</span>
         </div>
         <div class="summary-row">
             <span>RAS ({{ ras_percentage }}%):</span>
-            <span>{{ ras }} €</span>
+            <span>{{ ras }} DT</span>
         </div>
         <div class="summary-row total-row">
             <span>Net à payer:</span>
-            <span>{{ net_to_pay }} €</span>
+            <span>{{ net_to_pay }} DT</span>
         </div>
     </div>
 
