@@ -10,6 +10,8 @@ from xhtml2pdf import pisa
 from flask import render_template, make_response
 import io
 from flask import make_response
+#from flask import render_template
+import pdfkit
 
 
 
@@ -347,67 +349,92 @@ def download_document(id):
 
 
 
-#Download Facture as PDF
-@main.route('/factures/<int:id>/download', methods=['GET'])
-def download_facture_pdf(id):
-    facture = Facture.query.get_or_404(id)
-    
-    # Debug: Print all available attributes
-    print(f"Facture attributes: {vars(facture)}")
-    
-    # Calculate totals
-    lines = []
-    for line in facture.lines:
-        tva = 0 if line.designation == 'Frais' else line.prix_unitaire * 0.19
-        total_ht = line.prix_unitaire * line.quantite
-        lines.append({
-            'designation': line.designation,
-            'description': line.description,
-            'prix_unitaire': line.prix_unitaire,
-            'quantite': line.quantite,
-            'tva': tva,
-            'total_ht': total_ht
-        })
+from flask import render_template, make_response
+import pdfkit
 
-    total_services = sum(l['total_ht'] for l in lines if l['designation'] == 'Service')
-    total_frais = sum(l['total_ht'] for l in lines if l['designation'] == 'Frais')
-    total_tva = sum(l['tva'] * l['quantite'] for l in lines if l['designation'] == 'Service')
-    total_ttc = total_services + total_tva
-    ras = total_ttc * 0.03
-    net_a_payer = (total_ttc + total_frais + facture.timbre) - ras
+@main.route('/factures/<int:facture_id>/download', methods=['GET'])
+def download_facture_pdf(facture_id):
+    try:
+        # Fetch invoice data from database
+        facture = Facture.query.get_or_404(facture_id)
+        
+        # Calculate all necessary values
+        lines = []
+        for line in facture.lines:
+            tva = 0.0 if line.designation == 'Frais' else line.prix_unitaire * 0.19
+            total_ht = line.prix_unitaire * line.quantite
+            
+            lines.append({
+                'designation': line.designation,
+                'description': line.description,
+                'unit_price': line.prix_unitaire,
+                'quantity': line.quantite,
+                'total': total_ht,
+                'vat': tva
+            })
 
-    # Prepare all data for the template
-    context = {
-        'facture': facture,
-        'lines': lines,
-        'totals': {
-            'services': total_services,
-            'frais': total_frais,
-            'tva': total_tva,
-            'ttc': total_ttc,
-            'ras': ras,
-            'net_a_payer': net_a_payer,
-            'timbre': facture.timbre
-        },
-        'date_facturation': facture.date_facturation.strftime('%d/%m/%Y') if facture.date_facturation else 'N/A'
-    }
+        total_services = sum(l['total'] for l in lines if l['designation'] == 'Service')
+        total_frais = sum(l['total'] for l in lines if l['designation'] == 'Frais')
+        total_vat = sum(l['vat'] * l['quantity'] for l in lines if l['designation'] == 'Service')
+        total_ttc = total_services + total_vat
+        ras_percentage = 3  # Default RAS percentage
+        ras = total_ttc * (ras_percentage / 100)
+        net_to_pay = (total_ttc + total_frais + facture.timbre) - ras
 
-    # Render template with all necessary data
-    html = render_template('facture_pdf.html', **context)
+        # Prepare context for template
+        context = {
+            'invoice_number': facture.numero_facture,
+            'invoice_date': facture.date_facturation.strftime('%d/%m/%Y'),
+            'company_name': "Your Company Name",  # Replace with your company info
+            'company_address': "123 Business Street",
+            'company_phone': "+123 456 789",
+            'company_email': "contact@yourcompany.com",
+            'client_name': facture.nom_client,
+            'client_company': facture.nom_societe or "",
+            'client_address': facture.adresse or "",
+            'items': lines,
+            'total_services': f"{total_services:.2f}",
+            'total_vat': f"{total_vat:.2f}",
+            'total_ttc': f"{total_ttc:.2f}",
+            'fees': f"{total_frais:.2f}",
+            'stamp': f"{facture.timbre:.2f}",
+            'ras': f"{ras:.2f}",
+            'ras_percentage': ras_percentage,
+            'net_to_pay': f"{net_to_pay:.2f}"
+        }
 
-    # Generate PDF
-    result = io.BytesIO()
-    pdf = pisa.CreatePDF(io.StringIO(html), dest=result)
+        # Render template
+        rendered = render_template('invoice_template.html', **context)
+        
+        # Configure PDF options
+        options = {
+            'encoding': 'UTF-8',
+            'quiet': '',
+            'page-size': 'A4',
+            'margin-top': '15mm',
+            'margin-right': '15mm',
+            'margin-bottom': '15mm',
+            'margin-left': '15mm'
+        }
+        
+        # Generate PDF
+        pdf = pdfkit.from_string(rendered, False, options=options)
+        
+        if not pdf:
+            raise Exception("Failed to generate PDF")
 
-    if not pdf.err:
-        response = make_response(result.getvalue())
+        # Create response
+        response = make_response(pdf)
         response.headers['Content-Type'] = 'application/pdf'
         response.headers['Content-Disposition'] = f'attachment; filename=facture_{facture.numero_facture}.pdf'
         return response
-    return "Error generating PDF", 500
+
+    except Exception as e:
+        current_app.logger.error(f"Error generating PDF: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 
-from flask import render_template
+
 
 @main.route('/')
 def index_page():
