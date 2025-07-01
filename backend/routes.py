@@ -443,7 +443,7 @@ def index_page():
 
 @main.route('/create')
 def create_invoice_page():
-    return render_template('create_invoice.html')
+    return render_template('create-invoice.html')
 
 @main.route('/invoice/<int:id>')
 def view_invoice_page(id):

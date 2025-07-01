@@ -1,0 +1,74 @@
+<div class="invoice-form-container">
+    <h2>Create New Invoice</h2>
+    <form id="invoiceForm" class="invoice-form">
+        <!-- Client Information -->
+        <div class="form-section">
+            <h3>Client Information</h3>
+            <div class="form-group">
+                <label for="clientName">Client Name*</label>
+                <input type="text" id="clientName" name="clientName" required>
+            </div>
+            <!-- Add more client fields as needed -->
+        </div>
+
+        <!-- Invoice Details -->
+        <div class="form-section">
+            <h3>Invoice Details</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="invoiceDate">Invoice Date*</label>
+                    <input type="date" id="invoiceDate" name="invoiceDate" required>
+                </div>
+                <div class="form-group">
+                    <label for="dueDate">Due Date*</label>
+                    <input type="date" id="dueDate" name="dueDate" required>
+                </div>
+            </div>
+        </div>
+
+        <!-- Items Table -->
+        <div class="form-section">
+            <h3>Items</h3>
+            <table id="itemsTable" class="items-table">
+                <thead>
+                    <tr>
+                        <th>Description</th>
+                        <th>Quantity</th>
+                        <th>Unit Price</th>
+                        <th>Total</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Rows will be added dynamically -->
+                </tbody>
+            </table>
+            <button type="button" id="addItemBtn" class="btn-secondary">Add Item</button>
+        </div>
+
+        <!-- Totals -->
+        <div class="totals-section">
+            <div class="total-row">
+                <span>Subtotal:</span>
+                <span id="subtotal">0.00</span>
+            </div>
+            <div class="total-row">
+                <label for="taxRate">Tax Rate (%):</label>
+                <input type="number" id="taxRate" name="taxRate" min="0" max="100" step="0.01" value="0.00">
+            </div>
+            <div class="total-row">
+                <span>Tax Amount:</span>
+                <span id="taxAmount">0.00</span>
+            </div>
+            <div class="total-row grand-total">
+                <span>Total:</span>
+                <span id="grandTotal">0.00</span>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn-primary">Create Invoice</button>
+            <button type="button" class="btn-cancel">Cancel</button>
+        </div>
+    </form>
+</div>

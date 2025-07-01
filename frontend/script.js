@@ -1,41 +1,56 @@
-// script.js - Complete Implementation
+// script.js - Optimized Implementation
+const API_BASE_URL = window.location.origin; // Dynamic API base URL
+
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize the app
     loadInvoices();
     
     // Set up event listeners
-    document.getElementById('searchBtn').addEventListener('click', loadInvoices);
-    document.getElementById('resetBtn').addEventListener('click', resetFilters);
-    document.getElementById('createBtn').addEventListener('click', showCreateForm);
+    document.getElementById('searchBtn')?.addEventListener('click', loadInvoices);
+    document.getElementById('resetBtn')?.addEventListener('click', resetFilters);
+    document.getElementById('createBtn')?.addEventListener('click', showCreateForm);
+
+    // Invoice form initialization (conditionally)
+    const invoiceForm = document.getElementById('invoiceForm');
+    if (invoiceForm) {
+        addInvoiceItemRow();
+        document.getElementById('addItemBtn')?.addEventListener('click', addInvoiceItemRow);
+        invoiceForm.addEventListener('submit', handleInvoiceSubmit);
+        document.getElementById('taxRate')?.addEventListener('input', calculateInvoiceTotals);
+    }
+
+    // Event delegation for dynamic elements
+    document.querySelector('#itemsTable')?.addEventListener('click', (e) => {
+        if (e.target.classList.contains('btn-remove-item')) {
+            e.target.closest('tr').remove();
+            calculateInvoiceTotals();
+        }
+    });
 });
 
+// ==============================================
+// INVOICE LISTING FUNCTIONS
+// ==============================================
 async function loadInvoices() {
     const listContainer = document.getElementById('invoicesList');
+    if (!listContainer) return;
+    
     listContainer.innerHTML = '<div class="loading">Loading invoices...</div>';
     
     try {
-        // Get filter values
-        const params = new URLSearchParams();
-        const client = document.getElementById('searchClient').value;
-        const company = document.getElementById('searchCompany').value;
-        const date = document.getElementById('searchDate').value;
-        const status = document.getElementById('searchStatus').value;
+        const params = new URLSearchParams({
+            nom_client: document.getElementById('searchClient').value || '',
+            nom_societe: document.getElementById('searchCompany').value || '',
+            date_facturation: document.getElementById('searchDate').value || '',
+            status: document.getElementById('searchStatus').value || ''
+        });
         
-        if (client) params.append('nom_client', client);
-        if (company) params.append('nom_societe', company);
-        if (date) params.append('date_facturation', date);
-        if (status) params.append('status', status);
+        const response = await fetch(`${API_BASE_URL}/api/factures?${params.toString()}`);
         
-        const response = await fetch(`http://127.0.0.1:5000/api/factures?${params.toString()}`);
-        
-        if (!response.ok) {
-            throw new Error(`Failed to load invoices: ${response.status}`);
-        }
-        
-        const invoices = await response.json();
-        displayInvoicesList(invoices);
+        if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+        displayInvoicesList(await response.json());
     } catch (error) {
-        console.error('Error loading invoices:', error);
+        console.error('Invoice load failed:', error);
         listContainer.innerHTML = `
             <div class="error-message">
                 <p>Failed to load invoices</p>
@@ -47,262 +62,286 @@ async function loadInvoices() {
 
 function displayInvoicesList(invoices) {
     const listContainer = document.getElementById('invoicesList');
-    
-    if (invoices.length === 0) {
-        listContainer.innerHTML = '<div class="no-results">No invoices found matching your criteria</div>';
-        return;
-    }
-    
-    listContainer.innerHTML = '';
-    
-    invoices.forEach(invoice => {
-        const invoiceElement = document.createElement('div');
-        invoiceElement.className = 'invoice-card';
-        invoiceElement.innerHTML = `
-            <div class="invoice-card-header">
-                <span class="invoice-number">#${invoice.numero_facture}</span>
-                <span class="invoice-status ${invoice.status === 'payé' ? 'status-paid' : 'status-unpaid'}">
-                    ${invoice.status}
-                </span>
+    if (!listContainer) return;
+
+    listContainer.innerHTML = invoices.length === 0 
+        ? '<div class="no-results">No invoices found</div>'
+        : invoices.map(invoice => `
+            <div class="invoice-card" onclick="showInvoiceDetail(${invoice.id})">
+                <div class="invoice-card-header">
+                    <span class="invoice-number">#${invoice.numero_facture}</span>
+                    <span class="invoice-status ${invoice.status === 'payé' ? 'status-paid' : 'status-unpaid'}">
+                        ${invoice.status}
+                    </span>
+                </div>
+                <div class="invoice-client">${invoice.nom_client}</div>
+                <div class="invoice-date">${new Date(invoice.date_facturation).toLocaleDateString()}</div>
+                <div class="invoice-amount">${invoice.summary.net_a_payer.toFixed(2)} DZD</div>
             </div>
-            <div class="invoice-client">${invoice.nom_client}</div>
-            <div class="invoice-company">${invoice.nom_societe || ''}</div>
-            <div class="invoice-date">${invoice.date_facturation}</div>
-            <div class="invoice-amount">${invoice.summary.net_a_payer.toFixed(2)} DZD</div>
-        `;
-        
-        invoiceElement.addEventListener('click', () => showInvoiceDetail(invoice.id));
-        listContainer.appendChild(invoiceElement);
-    });
+        `).join('');
 }
 
+// ==============================================
+// INVOICE DETAIL FUNCTIONS
+// ==============================================
 async function showInvoiceDetail(invoiceId) {
     const detailContainer = document.getElementById('invoiceDetail');
     const listContainer = document.getElementById('invoicesList');
     
+    if (!detailContainer || !listContainer) return;
+    
     listContainer.classList.add('hidden');
-    detailContainer.innerHTML = '<div class="loading">Loading invoice details...</div>';
+    detailContainer.innerHTML = '<div class="loading">Loading details...</div>';
     detailContainer.classList.remove('hidden');
     
     try {
-        const response = await fetch(`http://127.0.0.1:5000/api/factures/${invoiceId}`);
-        
-        if (!response.ok) {
-            throw new Error(`Invoice not found: ${response.status}`);
-        }
-        
-        const invoice = await response.json();
-        displayInvoiceDetail(invoice);
+        const response = await fetch(`${API_BASE_URL}/api/factures/${invoiceId}`);
+        if (!response.ok) throw new Error(`Invoice load failed: ${response.status}`);
+        displayInvoiceDetail(await response.json());
     } catch (error) {
-        console.error('Error loading invoice:', error);
+        console.error('Detail load failed:', error);
         detailContainer.innerHTML = `
             <div class="error-message">
-                <p>Failed to load invoice details</p>
+                <p>Failed to load details</p>
                 <p>${error.message}</p>
+                <button onclick="hideInvoiceDetail()" class="back-btn">Back to List</button>
             </div>
-            <button onclick="hideInvoiceDetail()" class="back-btn">Back to List</button>
         `;
     }
 }
 
 function displayInvoiceDetail(invoice) {
     const detailContainer = document.getElementById('invoiceDetail');
-    
-    // Format date
-    const formattedDate = new Date(invoice.date_facturation).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-    });
-    
-    // Status styling
-    const statusClass = invoice.status.toLowerCase().includes('payé') ? 'paid' : 'unpaid';
-    
-    // Generate items table rows
-    const itemsRows = invoice.lines.map(line => `
-        <tr>
-            <td>${line.designation}</td>
-            <td>${line.description || '-'}</td>
-            <td class="text-right">${line.prix_unitaire.toFixed(2)}</td>
-            <td class="text-right">${line.quantite}</td>
-            <td class="text-right">${(line.prix_unitaire * line.quantite).toFixed(2)}</td>
-            <td class="text-right">${line.tva.toFixed(2)}</td>
-        </tr>
-    `).join('');
-    
-    // Generate documents section
-    const documentsHTML = generateDocumentsHTML(invoice.documents);
-    
-    // Build and display invoice
+    if (!detailContainer) return;
+
     detailContainer.innerHTML = `
         <div class="invoice-detail-container">
-            <button onclick="hideInvoiceDetail()" class="back-btn">← Back to List</button>
-            
-            <div class="invoice-header">
-                <div>
-                    <h2>Invoice #${invoice.numero_facture}</h2>
-                    <p class="invoice-date">${formattedDate}</p>
-                </div>
-                <span class="status-badge ${statusClass}">${invoice.status}</span>
-            </div>
-            
-            <div class="client-info">
-                <h3>Client Information</h3>
-                <p><strong>Name:</strong> ${invoice.nom_client}</p>
-                ${invoice.nom_societe ? `<p><strong>Company:</strong> ${invoice.nom_societe}</p>` : ''}
-                ${invoice.adresse ? `<p><strong>Address:</strong> ${invoice.adresse}</p>` : ''}
-            </div>
-            
-            <div class="invoice-items">
-                <h3>Items</h3>
-                <table class="items-table">
-                    <thead>
-                        <tr>
-                            <th>Designation</th>
-                            <th>Description</th>
-                            <th class="text-right">Unit Price</th>
-                            <th class="text-right">Quantity</th>
-                            <th class="text-right">Total HT</th>
-                            <th class="text-right">TVA</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${itemsRows}
-                    </tbody>
-                </table>
-            </div>
-            
-            <div class="invoice-summary">
-                <h3>Summary</h3>
-                <table class="summary-table">
-                    ${renderSummaryRow('Total Services:', invoice.summary.total_services)}
-                    ${renderSummaryRow('Total TVA:', invoice.summary.total_tva)}
-                    ${renderSummaryRow('Total TTC:', invoice.summary.total_ttc)}
-                    ${invoice.summary.total_frais > 0 ? renderSummaryRow('Frais:', invoice.summary.total_frais) : ''}
-                    ${invoice.timbre ? renderSummaryRow('Timbre:', invoice.timbre) : ''}
-                    ${renderSummaryRow('RAS (3%):', invoice.summary.ras)}
-                    ${renderSummaryRow('Net à payer:', invoice.summary.net_a_payer, true)}
-                </table>
-            </div>
-            
-            ${documentsHTML}
-            
-            <div class="invoice-actions">
-                <button onclick="window.print()" class="print-btn">
-                    Print Invoice
-                </button>
-                <button onclick="downloadInvoicePdf(${invoice.id})" class="pdf-btn">
-                    Download PDF
-                </button>
-                <button onclick="editInvoice(${invoice.id})" class="edit-btn">
-                    Edit Invoice
-                </button>
-                <button onclick="deleteInvoice(${invoice.id})" class="delete-btn">
-                    Delete Invoice
-                </button>
-            </div>
+            ${renderInvoiceHeader(invoice)}
+            ${renderClientInfo(invoice)}
+            ${renderItemsTable(invoice.lines)}
+            ${renderSummary(invoice.summary)}
+            ${renderDocuments(invoice.documents)}
+            ${renderActionButtons(invoice.id)}
         </div>
     `;
 }
 
+// ==============================================
+// INVOICE FORM FUNCTIONS
+// ==============================================
+function addInvoiceItemRow() {
+    const tbody = document.querySelector('#itemsTable tbody');
+    if (!tbody) return;
+
+    tbody.insertAdjacentHTML('beforeend', `
+        <tr>
+            <td><input type="text" class="item-desc" required placeholder="Item description"></td>
+            <td><input type="number" class="item-qty" min="1" value="1" required></td>
+            <td><input type="number" class="item-price" min="0" step="0.01" required placeholder="0.00"></td>
+            <td class="item-total">0.00</td>
+            <td><button type="button" class="btn-remove-item">×</button></td>
+        </tr>
+    `);
+}
+
+function calculateInvoiceRowTotal(e) {
+    const row = e.target.closest('tr');
+    if (!row) return;
+
+    const qty = parseFloat(row.querySelector('.item-qty').value) || 0;
+    const price = parseFloat(row.querySelector('.item-price').value) || 0;
+    row.querySelector('.item-total').textContent = (qty * price).toFixed(2);
+    calculateInvoiceTotals();
+}
+
+function calculateInvoiceTotals() {
+    let subtotal = 0;
+    document.querySelectorAll('.item-total').forEach(cell => {
+        subtotal += parseFloat(cell.textContent) || 0;
+    });
+
+    const taxRate = parseFloat(document.getElementById('taxRate').value) || 0;
+    const taxAmount = subtotal * (taxRate / 100);
+    
+    document.getElementById('subtotal').textContent = subtotal.toFixed(2);
+    document.getElementById('taxAmount').textContent = taxAmount.toFixed(2);
+    document.getElementById('grandTotal').textContent = (subtotal + taxAmount).toFixed(2);
+}
+
+async function handleInvoiceSubmit(e) {
+    e.preventDefault();
+    
+    // Form validation
+    const formData = {
+        client: document.getElementById('clientName').value.trim(),
+        date: document.getElementById('invoiceDate').value,
+        dueDate: document.getElementById('dueDate').value,
+        items: Array.from(document.querySelectorAll('#itemsTable tbody tr')).map(row => ({
+            description: row.querySelector('.item-desc').value.trim(),
+            quantity: parseFloat(row.querySelector('.item-qty').value),
+            price: parseFloat(row.querySelector('.item-price').value)
+        })),
+        subtotal: parseFloat(document.getElementById('subtotal').textContent),
+        tax: parseFloat(document.getElementById('taxAmount').textContent),
+        total: parseFloat(document.getElementById('grandTotal').textContent)
+    };
+
+    // Validation checks
+    if (!formData.client || !formData.date || formData.items.length === 0) {
+        alert("Please fill all required fields and add at least one item.");
+        return;
+    }
+
+    const invalidItems = formData.items.some(item => 
+        !item.description || item.quantity <= 0 || item.price <= 0
+    );
+    if (invalidItems) {
+        alert("Please check all item fields (description, quantity, price).");
+        return;
+    }
+
+    // Submit with CSRF protection
+    try {
+        const csrfToken = document.querySelector('input[name="csrf_token"]')?.value;
+        const response = await fetch(`${API_BASE_URL}/create_invoice`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken || ''
+            },
+            body: JSON.stringify(formData)
+        });
+
+        if (!response.ok) throw new Error(`Submission failed: ${response.status}`);
+        
+        const result = await response.json();
+        alert('Invoice created successfully!');
+        window.location.href = `/invoices/${result.invoice_id}`; // Redirect to new invoice
+    } catch (error) {
+        console.error('Submission error:', error);
+        alert(`Failed to create invoice: ${error.message}`);
+    }
+}
+
+// ==============================================
+// HELPER FUNCTIONS
+// ==============================================
 function hideInvoiceDetail() {
-    document.getElementById('invoiceDetail').classList.add('hidden');
-    document.getElementById('invoicesList').classList.remove('hidden');
+    document.getElementById('invoiceDetail')?.classList.add('hidden');
+    document.getElementById('invoicesList')?.classList.remove('hidden');
 }
 
 function resetFilters() {
-    document.getElementById('searchClient').value = '';
-    document.getElementById('searchCompany').value = '';
-    document.getElementById('searchDate').value = '';
-    document.getElementById('searchStatus').value = '';
+    ['searchClient', 'searchCompany', 'searchDate', 'searchStatus'].forEach(id => {
+        document.getElementById(id).value = '';
+    });
     loadInvoices();
 }
 
 function showCreateForm() {
-    // Implementation for create form would go here
-    alert('Create new invoice form would appear here');
+    window.location.href = '/invoices/create'; // Redirect to create page
 }
 
 async function downloadInvoicePdf(invoiceId) {
+    const btn = document.querySelector(`.pdf-btn[onclick*="${invoiceId}"]`);
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Generating...';
+    }
+
     try {
-        const response = await fetch(`http://127.0.0.1:5000/api/factures/${invoiceId}/download`);
-        
-        if (!response.ok) {
-            throw new Error('Failed to generate PDF');
-        }
+        const response = await fetch(`${API_BASE_URL}/api/factures/${invoiceId}/download`);
+        if (!response.ok) throw new Error('PDF generation failed');
         
         const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
+        const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         a.download = `invoice_${invoiceId}.pdf`;
-        document.body.appendChild(a);
         a.click();
-        document.body.removeChild(a);
     } catch (error) {
-        console.error('Error downloading PDF:', error);
-        alert('Failed to download PDF: ' + error.message);
+        console.error('PDF download failed:', error);
+        alert('PDF download failed: ' + error.message);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Download PDF';
+        }
     }
 }
 
-// Helper functions (keep from previous implementation)
-function generateDocumentsHTML(documents) {
-    if (!documents?.length) return '';
-    
+// ==============================================
+// RENDER HELPERS (DRY Templates)
+// ==============================================
+function renderInvoiceHeader(invoice) {
     return `
-        <div class="documents-section">
-            <h3>Attached Documents</h3>
-            <ul class="documents-list">
-                ${documents.map(doc => `
-                    <li class="document-item">
-                        <span class="doc-icon">📄</span>
-                        <a href="http://127.0.0.1:5000/api/documents/${doc.id}" 
-                           target="_blank" 
-                           class="doc-link">
-                           ${doc.name}
-                        </a>
-                        <a href="http://127.0.0.1:5000/api/documents/${doc.id}/download" 
-                           class="doc-download">
-                           (Download)
-                        </a>
-                    </li>
-                `).join('')}
-            </ul>
+        <button onclick="hideInvoiceDetail()" class="back-btn">← Back to List</button>
+        <div class="invoice-header">
+            <div>
+                <h2>Invoice #${invoice.numero_facture}</h2>
+                <p class="invoice-date">
+                    ${new Date(invoice.date_facturation).toLocaleDateString('en-US', { 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                    })}
+                </p>
+            </div>
+            <span class="status-badge ${invoice.status === 'payé' ? 'paid' : 'unpaid'}">
+                ${invoice.status}
+            </span>
         </div>
     `;
 }
 
-function renderSummaryRow(label, value, isTotal = false) {
+function renderClientInfo(invoice) {
     return `
-        <tr ${isTotal ? 'class="total-row"' : ''}>
-            <td>${isTotal ? `<strong>${label}</strong>` : label}</td>
-            <td class="text-right">${isTotal ? `<strong>${value.toFixed(2)}</strong>` : value.toFixed(2)}</td>
-        </tr>
+        <div class="client-info">
+            <h3>Client</h3>
+            <p><strong>Name:</strong> ${invoice.nom_client}</p>
+            ${invoice.nom_societe ? `<p><strong>Company:</strong> ${invoice.nom_societe}</p>` : ''}
+            ${invoice.adresse ? `<p><strong>Address:</strong> ${invoice.adresse}</p>` : ''}
+        </div>
     `;
 }
 
-// Stub functions for edit/delete
-function editInvoice(invoiceId) {
-    alert(`Edit invoice ${invoiceId} - implementation would go here`);
+function renderItemsTable(items) {
+    return `
+        <div class="invoice-items">
+            <h3>Items</h3>
+            <table class="items-table">
+                <thead>
+                    <tr>
+                        <th>Designation</th>
+                        <th>Description</th>
+                        <th class="text-right">Unit Price</th>
+                        <th class="text-right">Quantity</th>
+                        <th class="text-right">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${items.map(item => `
+                        <tr>
+                            <td>${item.designation}</td>
+                            <td>${item.description || '-'}</td>
+                            <td class="text-right">${item.prix_unitaire.toFixed(2)}</td>
+                            <td class="text-right">${item.quantite}</td>
+                            <td class="text-right">${(item.prix_unitaire * item.quantite).toFixed(2)}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
 }
 
-async function deleteInvoice(invoiceId) {
-    if (confirm('Are you sure you want to delete this invoice?')) {
-        try {
-            const response = await fetch(`http://127.0.0.1:5000/api/factures/${invoiceId}`, {
-                method: 'DELETE'
-            });
-            
-            if (!response.ok) {
-                throw new Error('Failed to delete invoice');
-            }
-            
-            alert('Invoice deleted successfully');
-            hideInvoiceDetail();
-            loadInvoices();
-        } catch (error) {
-            console.error('Error deleting invoice:', error);
-            alert('Failed to delete invoice: ' + error.message);
-        }
-    }
+function renderActionButtons(invoiceId) {
+    return `
+        <div class="invoice-actions">
+            <button onclick="window.print()" class="print-btn">Print</button>
+            <button onclick="downloadInvoicePdf(${invoiceId})" class="pdf-btn">Download PDF</button>
+            <button onclick="editInvoice(${invoiceId})" class="edit-btn">Edit</button>
+            <button onclick="deleteInvoice(${invoiceId})" class="delete-btn">Delete</button>
+        </div>
+    `;
 }
